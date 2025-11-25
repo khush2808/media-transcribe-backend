@@ -11,8 +11,9 @@ type SummarizeSessionResult = {
   summary: string;
 };
 
-const formatTime = (ms: number): string => {
-  const seconds = Math.floor(ms / 1000);
+const formatTime = (ms: number | bigint): string => {
+  const numericMs = typeof ms === "bigint" ? Number(ms) : ms;
+  const seconds = Math.floor(numericMs / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const secs = seconds % 60;
@@ -62,9 +63,9 @@ export class GeminiService {
     const transcript = input.segments
       .sort((a, b) => a.chunkIndex - b.chunkIndex)
       .map((segment) => {
-        const timePrefix = segment.startedAtMs
-          ? `[${formatTime(segment.startedAtMs)}] `
-          : "";
+        const startTime = segment.startedAtMs;
+        const timePrefix =
+          startTime != null ? `[${formatTime(startTime)}] ` : "";
         return `${timePrefix}${segment.text}`;
       })
       .join("\n\n");

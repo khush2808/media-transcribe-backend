@@ -41,8 +41,8 @@ model TranscriptSegment {
   sessionId   String
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   chunkIndex  Int
-  startedAtMs Int?
-  endedAtMs   Int?
+  startedAtMs BigInt?
+  endedAtMs   BigInt?
   text        String
   rawJson     Json?
   createdAt   DateTime @default(now())

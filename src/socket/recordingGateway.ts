@@ -10,6 +10,7 @@ const transcriptionService = new AssemblyAIService();
 const initSchema = z.object({
   title: z.string().min(3),
   mode: z.enum(["tab", "mic"]),
+  // sampleRate removed as we use file upload
 });
 
 const chunkSchema = z.object({
@@ -63,28 +64,32 @@ export const registerRecordingGateway = (io: Server) => {
     socket.on("audio:chunk", async (payload) => {
       try {
         const chunk = chunkSchema.parse(payload);
+        
         const transcription = await transcriptionService.transcribeChunk({
           mimeType: chunk.mimeType,
           audioBase64: chunk.audioBase64,
         });
 
-        await sessionService.appendSegment({
-          sessionId: chunk.sessionId,
-          chunkIndex: chunk.chunkIndex,
-          text: transcription.text,
-          startedAtMs: chunk.startedAtMs,
-          endedAtMs: chunk.endedAtMs,
-        });
+        if (transcription.text) {
+          await sessionService.appendSegment({
+            sessionId: chunk.sessionId,
+            chunkIndex: chunk.chunkIndex,
+            text: transcription.text,
+            startedAtMs: chunk.startedAtMs || Date.now(), // Use current time if not provided
+            endedAtMs: chunk.endedAtMs,
+          });
 
-        io.to(chunk.sessionId).emit("transcript:update", {
-          sessionId: chunk.sessionId,
-          chunkIndex: chunk.chunkIndex,
-          text: transcription.text,
-          startedAtMs: chunk.startedAtMs,
-          endedAtMs: chunk.endedAtMs,
-        });
+          io.to(chunk.sessionId).emit("transcript:update", {
+            sessionId: chunk.sessionId,
+            chunkIndex: chunk.chunkIndex,
+            text: transcription.text,
+            startedAtMs: chunk.startedAtMs,
+            endedAtMs: chunk.endedAtMs,
+          });
+        }
       } catch (error) {
-        emitError(socket, error, payload?.sessionId);
+        // Log but don't kill session
+        logger.error("Chunk transcription error", error);
       }
     });
 
@@ -124,5 +129,3 @@ export const registerRecordingGateway = (io: Server) => {
     });
   });
 };
-
-

@@ -1,3 +1,4 @@
+import { AssemblyAI } from "assemblyai";
 import axios from "axios";
 import { logger } from "../lib/logger";
 import { env } from "../config/env";
@@ -30,25 +31,22 @@ export class AssemblyAIService {
     }
 
     try {
-      // Convert base64 to Buffer
       const audioBuffer = Buffer.from(input.audioBase64, "base64");
 
-      // Upload audio to AssemblyAI
+      // 1. Upload
       const uploadResponse = await axios.post(`${this.baseUrl}/upload`, audioBuffer, {
         headers: {
           Authorization: this.apiKey,
           "Content-Type": "application/octet-stream",
         },
       });
-
       const uploadUrl = uploadResponse.data.upload_url;
 
-      // Submit transcription request
+      // 2. Transcribe
       const transcriptResponse = await axios.post(
         `${this.baseUrl}/transcript`,
         {
           audio_url: uploadUrl,
-          language_code: "en",
         },
         {
           headers: {
@@ -56,20 +54,18 @@ export class AssemblyAIService {
           },
         }
       );
-
       const transcriptId = transcriptResponse.data.id;
 
-      // Poll for completion
+      // 3. Poll
       let transcript = await this.pollTranscription(transcriptId);
-
-      // Keep polling until complete
       while (transcript.status === "queued" || transcript.status === "processing") {
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Fast poll
         transcript = await this.pollTranscription(transcriptId);
       }
 
       if (transcript.status === "error") {
-        throw new Error(`Transcription failed: ${transcript.error}`);
+        logger.error("AssemblyAI transcription error", transcript.error);
+        throw new Error(transcript.error);
       }
 
       return {
@@ -90,4 +86,3 @@ export class AssemblyAIService {
     return response.data;
   }
 }
-

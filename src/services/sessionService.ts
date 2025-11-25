@@ -1,4 +1,4 @@
-import { SessionStatus, SummaryStatus } from "@prisma/client";
+import { Session, SessionStatus, SummaryStatus, TranscriptSegment } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { GeminiService } from "./geminiService";
 import { logger } from "../lib/logger";
@@ -16,6 +16,25 @@ type AppendSegmentInput = {
   endedAtMs?: number;
 };
 
+const toPrismaBigInt = (value?: number | null): bigint | undefined =>
+  value == null ? undefined : BigInt(value);
+
+const bigIntToString = (value?: bigint | null) =>
+  value == null ? undefined : value.toString();
+
+const serializeTranscriptSegment = (segment: TranscriptSegment) => ({
+  ...segment,
+  startedAtMs: bigIntToString(segment.startedAtMs),
+  endedAtMs: bigIntToString(segment.endedAtMs),
+});
+
+type SessionWithSegments = Session & { segments: TranscriptSegment[] };
+
+const serializeSession = (session: SessionWithSegments) => ({
+  ...session,
+  segments: session.segments.map(serializeTranscriptSegment),
+});
+
 export class SessionService {
   constructor(private readonly gemini = new GeminiService()) {}
 
@@ -28,8 +47,8 @@ export class SessionService {
     });
   }
 
-  listSessions(limit = 20) {
-    return prisma.session.findMany({
+  async listSessions(limit = 20) {
+    const sessions = await prisma.session.findMany({
       orderBy: { updatedAt: "desc" },
       take: limit,
       include: {
@@ -38,10 +57,11 @@ export class SessionService {
         },
       },
     });
+    return sessions.map(serializeSession);
   }
 
-  getSession(sessionId: string) {
-    return prisma.session.findUnique({
+  async getSession(sessionId: string) {
+    const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
         segments: {
@@ -49,6 +69,10 @@ export class SessionService {
         },
       },
     });
+    if (!session) {
+      return null;
+    }
+    return serializeSession(session);
   }
 
   async appendSegment(input: AppendSegmentInput) {
@@ -57,8 +81,8 @@ export class SessionService {
         sessionId: input.sessionId,
         chunkIndex: input.chunkIndex,
         text: input.text,
-        startedAtMs: input.startedAtMs,
-        endedAtMs: input.endedAtMs,
+        startedAtMs: toPrismaBigInt(input.startedAtMs),
+        endedAtMs: toPrismaBigInt(input.endedAtMs),
       },
     });
 
