@@ -10,6 +10,7 @@ const envSchema = z.object({
     .transform((val) => Number(val ?? "4000")),
   DATABASE_URL: z.string(),
   GEMINI_API_KEY: z.string().optional(),
+  ASSEMBLYAI_API_KEY: z.string().optional(),
   CLIENT_ORIGIN: z.string().default("http://localhost:3001"),
 });
 

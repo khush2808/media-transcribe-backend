@@ -102,7 +102,9 @@ export class SessionService {
 
     await this.markSummaryStatus(sessionId, "RUNNING");
     try {
-      const summary = await this.gemini.summarizeSession(session.segments);
+      const { summary } = await this.gemini.summarizeSession({
+        segments: session.segments,
+      });
       await this.markSummaryStatus(sessionId, "READY", summary);
       return summary;
     } catch (error) {

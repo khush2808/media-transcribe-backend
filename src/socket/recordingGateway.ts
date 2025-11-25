@@ -1,11 +1,11 @@
 import { Server, Socket } from "socket.io";
 import { z } from "zod";
 import { SessionService } from "../services/sessionService";
-import { GeminiService } from "../services/geminiService";
+import { AssemblyAIService } from "../services/assemblyaiService";
 import { logger } from "../lib/logger";
 
 const sessionService = new SessionService();
-const geminiService = new GeminiService();
+const transcriptionService = new AssemblyAIService();
 
 const initSchema = z.object({
   title: z.string().min(3),
@@ -63,11 +63,9 @@ export const registerRecordingGateway = (io: Server) => {
     socket.on("audio:chunk", async (payload) => {
       try {
         const chunk = chunkSchema.parse(payload);
-        const history = await sessionService.getRecentTranscriptText(chunk.sessionId);
-        const transcription = await geminiService.transcribeChunk({
+        const transcription = await transcriptionService.transcribeChunk({
           mimeType: chunk.mimeType,
           audioBase64: chunk.audioBase64,
-          history,
         });
 
         await sessionService.appendSegment({
